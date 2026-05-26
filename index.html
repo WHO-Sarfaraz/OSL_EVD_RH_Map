@@ -249,6 +249,9 @@ table.detail-tbl tr:hover td{background:rgba(0,102,255,0.02)}
 .export-opt-icon{font-size:16px;flex-shrink:0}
 .export-opt-label{font-weight:500}
 .export-opt-sub{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:1px}
+
+.hdr-btn-print{background:#f59e0b;color:white}
+.hdr-btn-print:hover{background:#d97706}
 </style>
 </head>
 <body>
@@ -326,6 +329,10 @@ table.detail-tbl tr:hover td{background:rgba(0,102,255,0.02)}
       Mettre à jour
     </label>
     <input type="file" id="file-input" accept=".xlsx,.xls"/>
+    <button class="hdr-btn hdr-btn-print" onclick="printRH()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Imprimer plan RH
+    </button>
     <button class="hdr-btn hdr-btn-save" id="save-btn" onclick="saveHTML()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       Sauvegarde
@@ -1508,6 +1515,154 @@ function exportPDF() {
   if (!win) showToast('Autorisez les popups pour le PDF', 'error');
   else showToast('PDF pret - Ctrl+P pour sauvegarder', 'success');
   setTimeout(function() { URL.revokeObjectURL(url); }, 15000);
+}
+
+
+// ── IMPRIMER PLAN RH COMPLET ──
+function printRH() {
+  var today = new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+  var totalPosts = DATA.reduce(function(s,r){ return s+r.n; }, 0);
+  var staffed = DATA.filter(function(r){ return statusClass(r.stat)==='ok'; }).reduce(function(s,r){ return s+r.n; }, 0);
+  var vacant = totalPosts - staffed;
+
+  // Group by location
+  var byLoc = {};
+  DATA.forEach(function(r) {
+    if (!byLoc[r.loc]) byLoc[r.loc] = {niveau: r.niveau, roles: []};
+    byLoc[r.loc].roles.push(r);
+  });
+
+  var lvlColors = {ok:'#16a34a', id:'#d97706', va:'#dc2626'};
+  var lvlLabels = {ok:'Staffé', id:'Identifié', va:'Vacant'};
+  var catColors = {
+    'Coordination':'#7c3aed','Supply Chain':'#0891b2','Health Logistics':'#ea580c',
+    'Operations Support':'#0066ff','Warehouse':'#db2777','Fleet management':'#ca8a04',
+    'Fleet Management':'#ca8a04','Transport':'#16a34a','Procurement':'#64748b'
+  };
+  function getCatColor(cat) {
+    var k = (cat||'').trim();
+    if (catColors[k]) return catColors[k];
+    for (var key in catColors) { if (k.toLowerCase().indexOf(key.toLowerCase()) >= 0) return catColors[key]; }
+    return '#6b7280';
+  }
+
+  var sectionsHtml = '';
+  Object.keys(byLoc).forEach(function(locName) {
+    var loc = byLoc[locName];
+    var locTotal = loc.roles.reduce(function(s,r){ return s+r.n; }, 0);
+    var locStaffed = loc.roles.filter(function(r){ return statusClass(r.stat)==='ok'; }).reduce(function(s,r){ return s+r.n; }, 0);
+    var pct = locTotal > 0 ? Math.round(locStaffed/locTotal*100) : 0;
+    var barColor = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
+
+    var rows = '';
+    loc.roles.forEach(function(r) {
+      var sc = statusClass(r.stat);
+      var col = lvlColors[sc] || '#6b7280';
+      var lbl = lvlLabels[sc] || r.stat;
+      var catCol = getCatColor(r.cat);
+      var fnLabel = r.n > 1 ? r.fn + ' ×' + r.n : r.fn;
+      var nomCell = r.nom
+        ? '<span style="color:#0066ff;font-style:italic">' + r.nom + '</span>'
+        : '<span style="color:#9ca3af">—</span>';
+      var datesCell = (r.deb || r.fin)
+        ? (r.deb||'?') + ' → ' + (r.fin||'?')
+        : '<span style="color:#d1d5db">—</span>';
+      rows += '<tr>'
+        + '<td style="padding:6px 10px">'
+          + '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + catCol + ';margin-right:6px;vertical-align:middle"></span>'
+          + '<span style="font-size:10px;color:' + catCol + ';font-weight:600;text-transform:uppercase;letter-spacing:.04em">' + (r.cat||'') + '</span>'
+        + '</td>'
+        + '<td style="padding:6px 10px;font-weight:500">' + fnLabel + '</td>'
+        + '<td style="padding:6px 10px">' + nomCell + '</td>'
+        + '<td style="padding:6px 10px;font-size:10px;color:#6b7280">' + datesCell + '</td>'
+        + '<td style="padding:6px 10px;font-size:10px;color:#6b7280">' + (r.type||'') + '</td>'
+        + '<td style="padding:6px 10px;text-align:center">'
+          + '<span style="background:' + col + '1a;color:' + col + ';border:1px solid ' + col + '40;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">' + lbl + '</span>'
+        + '</td>'
+        + '</tr>';
+    });
+
+    sectionsHtml += '<div style="margin-bottom:24px;break-inside:avoid">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px 8px 0 0;border-bottom:none">'
+        + '<div>'
+          + '<span style="font-size:14px;font-weight:700;color:#1a1d23">' + locName + '</span>'
+          + '<span style="margin-left:10px;font-size:10px;color:#6b7280;font-family:monospace;background:#eff6ff;padding:2px 7px;border-radius:10px">' + loc.niveau + '</span>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:10px">'
+          + '<div style="width:80px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden">'
+            + '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:3px"></div>'
+          + '</div>'
+          + '<span style="font-size:11px;font-family:monospace;color:' + barColor + ';font-weight:600">' + locStaffed + '/' + locTotal + ' staffés</span>'
+        + '</div>'
+      + '</div>'
+      + '<table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:0 0 8px 8px;overflow:hidden">'
+        + '<thead><tr style="background:#fafafa">'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:140px">Catégorie</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0">Fonction</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:140px">Nom</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:160px">Dates</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:90px">Type</th>'
+          + '<th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:80px">Statut</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+      + '</table>'
+    + '</div>';
+  });
+
+  var doc = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<title>Plan RH EVD DRC - ' + today + '</title>'
+    + '<style>'
+    + 'body{font-family:Arial,sans-serif;margin:0;padding:24px 28px;color:#1a1d23;font-size:12px}'
+    + '.page-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2.5px solid #0066ff}'
+    + '.logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#0066ff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:13px;margin-right:12px;flex-shrink:0}'
+    + 'h1{font-size:18px;font-weight:700;margin:0 0 3px;letter-spacing:-0.01em}'
+    + '.sub{font-size:10px;color:#6b7280;font-family:monospace}'
+    + '.summary{display:flex;gap:10px;margin-bottom:22px}'
+    + '.sc{background:#f7f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:9px 14px;flex:1;text-align:center}'
+    + '.sn{font-size:22px;font-weight:700;font-family:monospace;line-height:1}'
+    + '.sl{font-size:9px;color:#6b7280;margin-top:3px;text-transform:uppercase;letter-spacing:.06em}'
+    + 'tr:nth-child(even) td{background:#fafafa}'
+    + 'tr:hover td{background:#f0f7ff}'
+    + '.footer{margin-top:24px;font-size:9px;color:#9ca3af;text-align:center;border-top:1px solid #e5e7eb;padding-top:10px}'
+    + '.legend{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}'
+    + '.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:#6b7280}'
+    + '@media print{body{padding:12px 16px}@page{margin:1cm;size:A4 landscape}}'
+    + '</style>'
+    + '</head><body>'
+    + '<div class="page-header">'
+      + '<div style="display:flex;align-items:center">'
+        + '<div class="logo">OSL</div>'
+        + '<div>'
+          + '<h1>Plan RH — Réponse EVD DRC</h1>'
+          + '<div class="sub">Généré le ' + today + ' · ' + Object.keys(byLoc).length + ' sites · ' + totalPosts + ' postes</div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="text-align:right"><div class="sub" style="color:#0066ff;font-weight:600">CONFIDENTIEL</div><div class="sub">OSL · WCARO</div></div>'
+    + '</div>'
+    + '<div class="summary">'
+      + '<div class="sc"><div class="sn" style="color:#1a1d23">' + totalPosts + '</div><div class="sl">Total postes</div></div>'
+      + '<div class="sc"><div class="sn" style="color:#16a34a">' + staffed + '</div><div class="sl">Staffés</div></div>'
+      + '<div class="sc"><div class="sn" style="color:#dc2626">' + vacant + '</div><div class="sl">Vacants</div></div>'
+      + '<div class="sc"><div class="sn" style="color:#d97706">' + Math.round(staffed/totalPosts*100) + '%</div><div class="sl">Taux staffing</div></div>'
+      + '<div class="sc"><div class="sn" style="color:#6b7280">' + Object.keys(byLoc).length + '</div><div class="sl">Sites actifs</div></div>'
+    + '</div>'
+    + '<div class="legend">'
+      + '<span style="font-size:10px;font-weight:600;color:#1a1d23;margin-right:4px">STATUT :</span>'
+      + '<span class="leg-item"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a1a;border:1px solid #bbf7d0;display:inline-block"></span> Staffé</span>'
+      + '<span class="leg-item"><span style="width:10px;height:10px;border-radius:50%;background:#d974061a;border:1px solid #fde68a;display:inline-block"></span> Identifié</span>'
+      + '<span class="leg-item"><span style="width:10px;height:10px;border-radius:50%;background:#dc26261a;border:1px solid #fecaca;display:inline-block"></span> Vacant</span>'
+    + '</div>'
+    + sectionsHtml
+    + '<div class="footer">Plan RH EVD DRC · OSL · ' + today + ' · Document confidentiel</div>'
+    + '<scr' + 'ipt>window.onload=function(){window.print();}<\/scr' + 'ipt>'
+    + '</body></html>';
+
+  var blob = new Blob([doc], {type:'text/html;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var win = window.open(url, '_blank');
+  if (!win) showToast('Autorisez les popups pour imprimer', 'error');
+  else showToast('Plan RH pret - Ctrl+P pour imprimer / PDF', 'success');
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 20000);
 }
 
 // ── Init ──
