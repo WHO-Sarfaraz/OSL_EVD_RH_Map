@@ -525,11 +525,12 @@ function parseXLSX(ab) {
     const r=rows[i];if(!r||r.every(c=>!c))continue;
     if(r[0])curNiveau=String(r[0]).trim();if(r[1])curLoc=String(r[1]).trim();
     const fn=r[2]?String(r[2]).trim():null,cat=r[3]?String(r[3]).trim():'',
-          type=r[4]?String(r[4]).trim():'',stat=r[5]?String(r[5]).trim():'Vacant',
-          n=parseInt(r[6])||1,nom=r[7]?String(r[7]).trim():null,
-          deb=r[8]?String(r[8]).trim():null,fin=r[9]?String(r[9]).trim():null;
+          type=r[4]?String(r[4]).trim():'',origine=r[5]?String(r[5]).trim():null,
+          stat=r[6]?String(r[6]).trim():'Vacant',n=parseInt(r[7])||1,
+          nom=r[8]?String(r[8]).trim():null,
+          deb=r[9]?String(r[9]).trim():null,fin=r[10]?String(r[10]).trim():null;
     if(!fn||!curLoc)continue;
-    result.push({niveau:curNiveau,loc:curLoc,fn,cat,type,stat,n,nom,deb,fin});
+    result.push({niveau:curNiveau,loc:curLoc.trim(),fn,cat,type,origine,stat,n,nom,deb,fin});
   }
   return result;
 }
@@ -547,7 +548,7 @@ function buildFilters(cats){
   activeFilters=new Set(cats);
   const el=document.getElementById('filter-list');el.innerHTML='';
   cats.forEach(cat=>{
-    const count=DATA.filter(r=>r.cat.trim()===cat).reduce((s,r)=>s+r.n,0);
+    const count=DATA.filter(r=>r.cat.trim()===cat).length;
     const item=document.createElement('div');
     item.className='fi active';item.dataset.cat=cat;
     item.innerHTML=`<div class="fi-dot" style="background:${catColor(cat)}"></div><div class="fi-name">${cat}</div><div class="fi-cnt">${count}</div>`;
@@ -569,7 +570,7 @@ function renderLocList(){
     const cats={};vis.forEach(r=>{cats[r.cat]=(cats[r.cat]||0)+r.n;});
     const tot=Object.values(cats).reduce((a,b)=>a+b,0);
     const bar=Object.entries(cats).map(([c,n])=>`<div class="loc-seg" style="flex:${n};background:${catColor(c)}"></div>`).join('');
-    const staffed=vis.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
+    const staffed=vis.filter(r=>statusClass(r.stat)==='ok').length;
     const item=document.createElement('div');
     item.className='loc-item'+(selectedLoc===loc.name?' selected':'');item.dataset.loc=loc.name;
     item.innerHTML=`<div class="loc-name">${loc.name}</div><div class="loc-level">${loc.niveau} · <span style="color:var(--green)">${staffed}</span>/${tot} staffés</div><div class="loc-bar">${bar}</div>`;
@@ -615,9 +616,9 @@ function makePieSVG(loc,size){
 function buildPopup(loc){
   const vis=loc.roles.filter(r=>activeFilters.has(r.cat.trim()));
   const grouped={};vis.forEach(r=>{const c=r.cat.trim();if(!grouped[c])grouped[c]=[];grouped[c].push(r);});
-  const total=vis.reduce((s,r)=>s+r.n,0),intl=vis.filter(r=>r.type==='International').reduce((s,r)=>s+r.n,0),
-        natl=vis.filter(r=>r.type!=='International').reduce((s,r)=>s+r.n,0),
-        staffed=vis.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
+  const total=vis.length,intl=vis.filter(r=>r.type==='International').length,
+        natl=vis.filter(r=>r.type!=='International').length,
+        staffed=vis.filter(r=>statusClass(r.stat)==='ok').length;
   let catHtml='';
   Object.entries(grouped).forEach(([cat,roles])=>{
     catHtml+=`<div class="popup-cat-ttl" style="color:${catColor(cat)}">${cat}</div>`;
@@ -625,7 +626,8 @@ function buildPopup(loc){
       const sc=statusClass(r.stat),sl=statusLabel(r.stat),fnLabel=r.n>1?`${r.fn} ×${r.n}`:r.fn;
       const nomLine=r.nom?`<div class="role-name">👤 ${r.nom}</div>`:'';
       const dateLine=(r.deb||r.fin)?`<div class="role-dates">${r.deb||''}${r.deb&&r.fin?' → ':''}${r.fin||''}</div>`:'';
-      catHtml+=`<div class="popup-role"><span class="role-st st-${sc}">${sl}</span><div class="role-info"><div class="role-fn">${fnLabel}</div>${nomLine}${dateLine}</div><span class="role-type">${r.type}</span></div>`;
+      const origLine=r.origine?('<div class="role-name" style="color:#7c3aed">🏢 '+r.origine+'</div>'):'';
+      catHtml+=`<div class="popup-role"><span class="role-st st-${sc}">${sl}</span><div class="role-info"><div class="role-fn">${fnLabel}</div>${nomLine}${origLine}${dateLine}</div><span class="role-type">${r.type}</span></div>`;
     });
   });
   return `<div class="popup-inner"><div class="popup-loc">${loc.name}</div><div class="popup-lvl">${loc.niveau}</div><div class="popup-div"></div>${catHtml}</div>
@@ -652,8 +654,8 @@ function renderMarkers(){
 
 function updateStats(){
   const vis=DATA.filter(r=>activeFilters.has(r.cat.trim()));
-  const total=vis.reduce((s,r)=>s+r.n,0),intl=vis.filter(r=>r.type==='International').reduce((s,r)=>s+r.n,0),
-        natl=vis.filter(r=>r.type!=='International').reduce((s,r)=>s+r.n,0),
+  const total=vis.length,intl=vis.filter(r=>r.type==='International').length,
+        natl=vis.filter(r=>r.type!=='International').length,
         sites=LOCATIONS.filter(l=>l.roles.some(r=>activeFilters.has(r.cat.trim()))&&getCoords(l.name)).length;
   document.getElementById('s-total').textContent=total;document.getElementById('s-intl').textContent=intl;
   document.getElementById('s-natl').textContent=natl;document.getElementById('s-sites').textContent=sites;
@@ -664,7 +666,7 @@ function loadData(rows,filename){
   DATA=rows;LOCATIONS=groupByLoc(rows);currentFilename=filename;
   const cats=getCategories(LOCATIONS);
   buildFilters(cats);renderMarkers();renderLocList();
-  const total=rows.reduce((s,r)=>s+r.n,0),staffed=rows.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
+  const total=rows.length,staffed=rows.filter(r=>statusClass(r.stat)==='ok').length;
   document.getElementById('header-sub').textContent=`${LOCATIONS.length} sites · ${total} postes · ${staffed} staffés · ${new Date().toLocaleDateString('fr-FR')}`;
   if(filename){const b=document.getElementById('upload-badge');b.textContent=filename;b.classList.add('visible');}
   document.getElementById('status-txt').textContent=`${total} postes, ${staffed} staffés`;
@@ -758,75 +760,75 @@ function showToast(msg,type){
 
 // ── Données intégrées (V3 — 24 mai 2026) ──
 const DEFAULT_ROWS = [
-  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Team Lead OSL - DRC',cat:'Coordination',type:'International',stat:'Recruté',n:1,nom:'Ahmadou Wouna',deb:'22 mai 2026',fin:'30 Septembre 2026'},
-  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Supply Chain Officer',cat:'Supply Chain',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Warehouse Manager',cat:'Warehouse',type:'UNV',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Warehouse Assistant',cat:'Warehouse',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Procurement Officer',cat:'Procurement',type:'National',stat:'Recruté',n:1,nom:'Fifi Tembo',deb:'22 Mai 2026',fin:'30 Septembre 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Team Lead OSL - EVD responses',cat:'Coordination',type:'International',stat:'Recruté',n:1,nom:'Zinedine Kada',deb:'22 mai 2026',fin:'1 juillet 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Health Logistician',cat:'Health Logistics',type:'International',stat:'Recruté',n:1,nom:'Luca Fontana',deb:'22 mai 2026',fin:'5 juin 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'HLCP Coordinator',cat:'Health Logistics',type:'International',stat:'Identified',n:1,nom:'Jason Carmichael',deb:null,fin:'1 juillet 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Log Field Support',cat:'Operations Support',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Supply Chain Manager',cat:'Supply Chain',type:'International',stat:'Recruté',n:1,nom:'Lesly Dieuville',deb:'22 mai 2026',fin:'30 juin 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Deputy SCM / Mobile implementing officer',cat:'Supply Chain',type:'International',stat:'Recruté',n:1,nom:'Miquel Serra',deb:'22 mai 2026',fin:'30 juin 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Fleet manager',cat:'Fleet management',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Recruté',n:1,nom:'Jacques Kanyala',deb:'22 mai 2026',fin:'30 juin 2026'},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Log Ops',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Supply',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Warehouse Assistant',cat:'Warehouse',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Procurement Assistant',cat:'Procurement',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination EVD',loc:'Bunia',fn:'Drivers',cat:'Transport',type:'National',stat:'Recruté',n:3,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Log OPS Officer',cat:'Operations Support',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Health Logistician',cat:'Health Logistics',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Assistant Supply Support',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Mongbwalu',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Log OPS Officer',cat:'Operations Support',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Health Logistician',cat:'Health Logistics',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Supply Support',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'OSL TL',cat:'Coordination',type:'International',stat:'Identified',n:1,nom:'Jerome Souquet',deb:'1 juin 2026',fin:'15 juillet 2026'},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Log OPS Officer',cat:'Operations Support',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Log Field Ops',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',stat:'Recruté',n:1,nom:'Aline Katungu',deb:'22 mai 2026',fin:'30 Septembre 2026'},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',stat:'Recruté',n:1,nom:'Frederic Saburo',deb:'22 mai 2026',fin:'30 Septembre 2026'},
-  {niveau:'Sous Coordination',loc:'Goma',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:3,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Log OPS Officer',cat:'Operations Support',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Beni',fn:'Procurement Assistant',cat:'Procurement',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Log OPS Officer',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
-  {niveau:'Sous Coordination',loc:'Butembo',fn:'Procurement Assistant',cat:'Procurement',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Team Lead OSL',cat:'Coordination',type:'International',stat:'Recruté',n:1,nom:'Carla Mendizabal',deb:'22 mai 2026',fin:'15 juillet 2026'},
-  {niveau:'Coordination',loc:'Uganda',fn:'Health Logistician',cat:'Health Logistics',type:'International',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Polyvalent LOG support',cat:'Operations Support',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Supply Chain Officer',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Warehouse Officer',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Storekeeper',cat:'Supply Chain',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Procurement officer',cat:'Procurement',type:'National',stat:'Vacant',n:1,nom:null,deb:null,fin:null},
-  {niveau:'Coordination',loc:'Uganda',fn:'Drivers',cat:'Transport',type:'National',stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Team Lead OSL - DRC',cat:'Coordination',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Ahmadou Wouna',deb:'22 mai 2026',fin:'30 Septembre 2026'},
+  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Supply Chain Officer',cat:'Supply Chain',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Warehouse Manager',cat:'Warehouse',type:'UNV',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Warehouse Assistant',cat:'Warehouse',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination CO / dispatch',loc:'Kinshasa',fn:'Procurement Officer',cat:'Procurement',type:'National',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Fifi Tembo',deb:'22 Mai 2026',fin:'30 Septembre 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Team Lead OSL - EVD responses',cat:'Coordination',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Zinedine Kada',deb:'22 mai 2026',fin:'1 juillet 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Health Logistician',cat:'Health Logistics',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Luca Fontana',deb:'22 mai 2026',fin:'5 juin 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'HLCP Coordinator',cat:'Health Logistics',type:'International',origine:'Consultant',stat:'Identified',n:1,nom:'Jason Carmichael',deb:'1 juin 2026',fin:'15 juillet 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Log Field Support',cat:'Operations Support',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Supply Chain Manager',cat:'Supply Chain',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Lesly Dieuville',deb:'22 mai 2026',fin:'30 juin 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Deputy SCM / Mobile implementing officer',cat:'Supply Chain',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Miquel Serra',deb:'22 mai 2026',fin:'30 juin 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Fleet manager',cat:'Fleet management',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Jacques Kanyala',deb:'22 mai 2026',fin:'30 juin 2026'},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Log Ops',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Assistant Supply',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Warehouse Assistant',cat:'Warehouse',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Procurement Assistant',cat:'Procurement',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination EVD',loc:'Bunia',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Recruté',n:3,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Log OPS Officer',cat:'Operations Support',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Health Logistician',cat:'Health Logistics',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Assistant Supply Support',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Mongbwalo',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Log OPS Officer',cat:'Operations Support',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Health Logistician',cat:'Health Logistics',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Assistant Supply Support',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Rwampara',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'OSL TL',cat:'Coordination',type:'International',origine:'Consultant',stat:'Identifié',n:1,nom:'Jerome Souquet',deb:'1 juin 2026',fin:'15 juillet 2026'},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Log OPS Officer',cat:'Operations Support',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Log Field Ops',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Aline Katungu',deb:'22 mai 2026',fin:'30 Septembre 2026'},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Warehouse storekeeper',cat:'Supply Chain',type:'National',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Frederic Saburo',deb:'22 mai 2026',fin:'30 Septembre 2026'},
+  {niveau:'Sous Coordination',loc:'Goma',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:3,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Log OPS Officer',cat:'Operations Support',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Beni',fn:'Procurement Assistant',cat:'Procurement',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Log OPS Officer',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Log Field Ops / assistant fleet',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Assistant Supply Support / procurement',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null},
+  {niveau:'Sous Coordination',loc:'Butembo',fn:'Procurement Assistant',cat:'Procurement',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Team Lead OSL',cat:'Coordination',type:'International',origine:'WHO Deployement',stat:'Recruté',n:1,nom:'Carla Mendizabal',deb:'22 mai 2026',fin:'15 juillet 2026'},
+  {niveau:'Coordination',loc:'Uganda',fn:'Health Logistician',cat:'Health Logistics',type:'International',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Polyvalent LOG support',cat:'Operations Support',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Supply Chain Officer',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Assistant Health Log',cat:'Health Logistics',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Warehouse Officer',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Storekeeper',cat:'Supply Chain',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Procurement officer',cat:'Procurement',type:'National',origine:null,stat:'Vacant',n:1,nom:null,deb:null,fin:null},
+  {niveau:'Coordination',loc:'Uganda',fn:'Drivers',cat:'Transport',type:'National',origine:null,stat:'Vacant',n:2,nom:null,deb:null,fin:null}
 ];
 
 // ── ★ PARTAGER ──
 function buildSummaryText() {
-  const total = DATA.reduce((s,r)=>s+r.n,0);
-  const staffed = DATA.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
-  const intl = DATA.filter(r=>r.type==='International').reduce((s,r)=>s+r.n,0);
-  const natl = DATA.filter(r=>r.type!=='International').reduce((s,r)=>s+r.n,0);
+  const total = DATA.length;
+  const staffed = DATA.filter(r=>statusClass(r.stat)==='ok').length;
+  const intl = DATA.filter(r=>r.type==='International').length;
+  const natl = DATA.filter(r=>r.type!=='International').length;
   const date = new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
 
   let lines = [];
@@ -839,8 +841,8 @@ function buildSummaryText() {
   lines.push(`━━━━━━━━━━━━━━━━━━━━━━━`);
   LOCATIONS.forEach(loc => {
     if (!getCoords(loc.name)) return;
-    const tot = loc.roles.reduce((s,r)=>s+r.n,0);
-    const ok  = loc.roles.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
+    const tot = loc.roles.length;
+    const ok  = loc.roles.filter(r=>statusClass(r.stat)==='ok').length;
     const pct = Math.round(ok/tot*100);
     const bar = ok===tot ? '🟢' : ok===0 ? '🔴' : '🟡';
     lines.push(`${bar} ${loc.name.padEnd(12)} ${ok}/${tot} staffés (${pct}%)`);
@@ -857,8 +859,8 @@ function buildSummaryText() {
 function openShare() {
   const summary = buildSummaryText();
   document.getElementById('share-summary-box').textContent = summary;
-  const total = DATA.reduce((s,r)=>s+r.n,0);
-  const staffed = DATA.filter(r=>statusClass(r.stat)==='ok').reduce((s,r)=>s+r.n,0);
+  const total = DATA.length;
+  const staffed = DATA.filter(r=>statusClass(r.stat)==='ok').length;
   document.getElementById('share-modal-sub').textContent =
     `${LOCATIONS.filter(l=>getCoords(l.name)).length} sites · ${total} postes · ${staffed} staffés`;
   document.getElementById('share-modal').classList.add('show');
@@ -1045,13 +1047,14 @@ function renderAlertPanel() {
     const endFormatted = r.fin || '—';
     const fnShort = r.fn.length > 26 ? r.fn.substring(0,24)+'…' : r.fn;
 
+    const origBadge = r.origine ? ` · <span style="color:#7c3aed">${r.origine}</span>` : '';
     return `<div class="ap-row">
       <div class="ap-row-top">
         <div class="ap-avatar" style="background:${color}">${initials}</div>
         <div class="ap-name" title="${r.nom}">${r.nom}</div>
         <span class="ap-badge ap-badge-${lvl}">${badgeLabel}</span>
       </div>
-      <div class="ap-meta">${fnShort} · ${r.loc}</div>
+      <div class="ap-meta">${fnShort} · ${r.loc}${origBadge}</div>
       <div class="ap-meta" style="margin-top:1px">Fin : ${endFormatted}</div>
       ${pct !== null ? `<div class="ap-prog" title="Mission à ${pct}%"><div class="ap-prog-fill" style="width:${pct}%;background:${color}"></div></div>` : ''}
     </div>`;
@@ -1114,7 +1117,8 @@ function parseDate(str) {
     const day = parseInt(m[1]), yr = parseInt(m[3]);
     const raw = m[2].toLowerCase()
       .replace(/[éè]/g,'e').replace(/û/g,'u').replace(/â/g,'a')
-      .replace(/î/g,'i').replace(/ô/g,'o').replace(/à/g,'a');
+      .replace(/î/g,'i').replace(/ô/g,'o').replace(/à/g,'a')
+      .replace(/julllet/g,'juillet').replace(/jullet/g,'juillet');
     // Full-word first to avoid juin/juillet collision
     const full = {
       janvier:0,fevrier:1,mars:2,avril:3,mai:4,juin:5,
@@ -1451,7 +1455,7 @@ function getExportRows() {
 function exportExcel() {
   document.getElementById('export-dropdown').classList.remove('open');
   var rows = getExportRows();
-  var hdrs = ['Nom','Fonction','Site','Niveau','Type','Debut mission','Fin mission','Jours restants','Alerte','Avancement'];
+  var hdrs = ['Nom','Fonction','Site','Niveau','Type','Origine','Debut mission','Fin mission','Jours restants','Alerte','Avancement'];
   var lvlLbl = {w1:'<= 1 semaine',w2:'<= 2 semaines',w3:'<= 3 semaines',w4:'<= 4 semaines',ok:'OK',expired:'Expire'};
   var lines = [hdrs.join(';')];
   rows.forEach(function(r) {
@@ -1466,7 +1470,7 @@ function exportExcel() {
       var ela = Math.round((new Date() - s2) / 86400000);
       if (tot > 0) pct = Math.max(0, Math.min(100, Math.round(ela / tot * 100))) + '%';
     }
-    lines.push([r.nom||'', r.fn||'', r.loc||'', r.niveau||'', r.type||'',
+    lines.push([r.nom||'', r.fn||'', r.loc||'', r.niveau||'', r.type||'', r.origine||'',
       r.deb||'', r.fin||'', dlTxt, alTxt, pct
     ].map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'));
   });
@@ -1510,6 +1514,7 @@ function exportPDF() {
       + '<td style="font-weight:500">' + (r.nom||'') + '</td>'
       + '<td style="color:#6b7280;font-size:11px">' + (r.fn||'') + '</td>'
       + '<td>' + (r.loc||'') + '</td>'
+      + '<td style="font-size:10px">' + (r.origine ? '<span style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;padding:1px 5px;border-radius:8px;font-size:10px">' + r.origine + '</span>' : '<span style="color:#d1d5db">—</span>') + '</td>'
       + '<td style="font-size:11px;color:#6b7280">' + (r.deb||'-') + '</td>'
       + '<td style="font-size:11px;color:#6b7280">' + (r.fin||'-') + '</td>'
       + '<td>' + prog + '</td>'
@@ -1542,7 +1547,7 @@ function exportPDF() {
     + '<div class="sc"><div class="sn" style="color:#dc2626">' + urgent + '</div><div class="sl">Alertes critiques</div></div>'
     + '<div class="sc"><div class="sn" style="color:#16a34a">' + (rows.length - urgent) + '</div><div class="sl">Missions OK</div></div>'
     + '</div>'
-    + '<table><thead><tr><th>Nom</th><th>Fonction</th><th>Site</th><th>Debut</th><th>Fin</th><th>Avancement</th><th>Alerte</th></tr></thead>'
+    + '<table><thead><tr><th>Nom</th><th>Fonction</th><th>Site</th><th>Origine</th><th>Debut</th><th>Fin</th><th>Avancement</th><th>Alerte</th></tr></thead>'
     + '<tbody>' + trows + '</tbody></table>'
     + '<div class="ftr">OSL EVD DRC - Plan RH - ' + today + '</div>'
     + '<scr' + 'ipt>window.onload=function(){window.print();}<\/scr' + 'ipt>'
@@ -1560,8 +1565,8 @@ function exportPDF() {
 // ── IMPRIMER PLAN RH COMPLET ──
 function printRH() {
   var today = new Date().toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
-  var totalPosts = DATA.reduce(function(s,r){ return s+r.n; }, 0);
-  var staffed = DATA.filter(function(r){ return statusClass(r.stat)==='ok'; }).reduce(function(s,r){ return s+r.n; }, 0);
+  var totalPosts = DATA.length;
+  var staffed = DATA.filter(function(r){ return statusClass(r.stat)==='ok'; }).length;
   var vacant = totalPosts - staffed;
 
   // Group by location
@@ -1588,8 +1593,8 @@ function printRH() {
   var sectionsHtml = '';
   Object.keys(byLoc).forEach(function(locName) {
     var loc = byLoc[locName];
-    var locTotal = loc.roles.reduce(function(s,r){ return s+r.n; }, 0);
-    var locStaffed = loc.roles.filter(function(r){ return statusClass(r.stat)==='ok'; }).reduce(function(s,r){ return s+r.n; }, 0);
+    var locTotal = loc.roles.length;
+    var locStaffed = loc.roles.filter(function(r){ return statusClass(r.stat)==='ok'; }).length;
     var pct = locTotal > 0 ? Math.round(locStaffed/locTotal*100) : 0;
     var barColor = pct === 100 ? '#16a34a' : pct >= 50 ? '#d97706' : '#dc2626';
 
@@ -1615,6 +1620,7 @@ function printRH() {
         + '<td style="padding:6px 10px">' + nomCell + '</td>'
         + '<td style="padding:6px 10px;font-size:10px;color:#6b7280">' + datesCell + '</td>'
         + '<td style="padding:6px 10px;font-size:10px;color:#6b7280">' + (r.type||'') + '</td>'
+      + '<td style="padding:6px 10px;font-size:10px"><span style="' + (r.origine?'background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:500':'color:#d1d5db') + '">' + (r.origine||'—') + '</span></td>'
         + '<td style="padding:6px 10px;text-align:center">'
           + '<span style="background:' + col + '1a;color:' + col + ';border:1px solid ' + col + '40;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">' + lbl + '</span>'
         + '</td>'
@@ -1641,6 +1647,7 @@ function printRH() {
           + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:140px">Nom</th>'
           + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:160px">Dates</th>'
           + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:90px">Type</th>'
+          + '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:110px">Origine</th>'
           + '<th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;border-bottom:1px solid #f0f0f0;width:80px">Statut</th>'
         + '</tr></thead>'
         + '<tbody>' + rows + '</tbody>'
@@ -1757,7 +1764,7 @@ document.addEventListener('keydown', function(e) {
 // ── Init ──
 loadData(DEFAULT_ROWS, null);
 document.getElementById('header-sub').textContent =
-  `Plan RH EVD DRC · 24 mai 2026 · ${LOCATIONS.length} sites · ${DEFAULT_ROWS.reduce((s,r)=>s+r.n,0)} postes`;
+  `Plan RH EVD DRC · 31 mai 2026 · ${LOCATIONS.length} sites · ${DEFAULT_ROWS.length} postes`;
 </script>
 </body>
 </html>
